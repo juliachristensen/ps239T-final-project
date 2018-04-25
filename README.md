@@ -34,7 +34,7 @@ The following files and folders are stored here: "ps239T-final-project\Data_Geo_
 
 The following files and folders are stored here: "ps239T-final-project\Geo_Project_PS239T\Data_R\"
 
-1. 	cess_all.RData: Saved .R version of the following CCES files: *cces_dat*: Cumulative CCES Common Content (2006-2016)  
+1.  cess_all.RData: Saved .R version of the following CCES files: *cces_dat*: Cumulative CCES Common Content (2006-2016)  
 2.  cess_cum.RData: Saved .R version of the following CCES files: *cces_dat*: Cumulative CCES Common Content (2006-2016)
 3.  census_2016_poverty.RData: copy of data downloaded from census. Allows for data analysis even if API key is missing from script #5.
 
@@ -98,5 +98,12 @@ The following files and folders are stored here: "ps239T-final-project\Geo_Proje
 ### API Key:
 Script #5 requires a Census API key. Either contact Julia for key or request key using this link:https://api.census.gov/data/key_signup.html.  
 
-### CCES data
+### CCES data:
 Due to github size limitations, I replaced the original download with a subset. I removed two variables with duplicate information (state and cd).  
+
+### File Structure:
+I started this project using a differnt file structure which differentiates between raw data and manipulated data. Hopefully, it will not be a problem that I did not use the exact file structure described in the instructions.
+- "ps239T-final-project\Data_Geo_Sophistication" - Raw Data  
+- "ps239T-final-project\Geo_Project_PS239T\Data_R\" - Manipulated Data  
+- "ps239T-final-project\Geo_Project_PS239T\Analysis\" - Code  
+- "ps239T-final-project\Geo_Project_PS239T\Output\" - Results  
