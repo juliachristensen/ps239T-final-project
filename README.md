@@ -55,42 +55,42 @@ The following files and folders are stored here: "ps239T-final-project\Geo_Proje
 ### Results
 
 1.  cces_count_USA.pdf: Map of CCES respondents by county  
-	- Note: Subfolder called "CCES_Count_States" contains map of CCES respondents by county for each state  
-2.  Census_Poverty_County_2016_ln_poverty_rate_A.pdf: Map of % population in poverty (according to US Census); continuous scale  
-3.  Census_Poverty_County_2016_ln_poverty_rate_scale_A.pdf: Map of % population in poverty (according to US Census); logged, continuous scale  
-4.  Census_Poverty_County_2016_poverty_rate_A.pdf: Map of % population in poverty (according to US Census); discrete scale  
-5.  Census_Poverty_County_2016_poverty_rate_scale_A.pdf: Map of % population in poverty (according to US Census); discrete scale of logged rate  
-6.  Census_rural_2010_s_USA_A.pdf: Map of % rural population by state using US Census data; color option A  
-7.  Census_rural_2010_s_USA_B.pdf: Map of % rural population by state using US Census data; color option B  
-8.  Census_rural_2010_s_USA_D.pdf: Map of % rural population by state using US Census data; color option D  
-9.  Census_rural_2010_USA_A.pdf: Map of % rural population by county using US Census data; color option A  
-10.  Census_rural_2010_USA_B.pdf: Map of % rural population by county using US Census data; color option B  
-11.  Census_rural_2010_USA_D.pdf: Map of % rural population by county using US Census data; color option D  
-12.  USDA_EconType_2013_USA.pdf: Map of Econ typology from USDA  
-13.  USDA_EconType_Alt1_2013_USA.pdf: Map of Econ typology from USDA; alternative color option 1  
-14.  USDA_EconType_Alt2_2013_USA.pdf: Map of Econ typology from USDA; alternative color option 2  
-15.  USDA_Low_Edu_2013_USA.pdf: Map of Low education indicator from USDA  
-16.  USDA_Low_Employment_2013_USA.pdf: Map of Low employment indicator from USDA  
-17.  USDA_Persistant_Child_Poverty_2013_USA.pdf: Map of Persistant Child Poverty indicator from USDA  
-18.  USDA_Persistant_Poverty_2013_USA.pdf: Map of Persistant Poverty indicator from USDA   
-19.  USDA_Pop_Loss_2010_USA.pdf: Map of population loss indicator from USDA  
-20.  USDA_Retirement_Dest_2013_USA.pdf: Map of retirement destination indicator from USDA  
-21.  USDA_RUCC_2013_USA_A.pdf: Map of RUCC from USDA; color option A  
-22.  USDA_RUCC_2013_USA_B.pdf: Map of RUCC from USDA; color option B
-23.  USDA_RUCC_2013_USA_D.pdf: Map of RUCC from USDA; color option D
-24.  USDA_UIC_2013_USA_A.pdf: Map of RUCC from USDA; color option A
-25.  USDA_UIC_2013_USA_B.pdf: Map of RUCC from USDA; color option B
-26.  USDA_UIC_2013_USA_D.pdf: Map of RUCC from USDA; color option D
-27.  USDA_UIC6_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with UIC > 5
-28.  USDA_UIC7_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with UIC > 6
-29.  USDA_UIC8_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with UIC > 7
-30.  USDA_UIC9_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with UIC > 8
-31.  USDA_URCC4_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with RUCC > 3
-32.  USDA_URCC5_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with RUCC > 4
-33.  USDA_URCC6_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with RUCC > 5
-34.  USDA_URCC7_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with RUCC > 6
-35.  Compare_UIC_v_Census_Rural.pdf: Plot USDA scale (UIC) against Census % rural by county.  
-36.  Compare_RUCC_v_Census_Rural.pdf: Plot USDA scale (RUCC) against Census % rural by county.  
+2. [FOLDER] CCES_Count_States: Subfolder called "CCES_Count_States" contains map of CCES respondents by county for each state  
+3.  Census_Poverty_County_2016_ln_poverty_rate_A.pdf: Map of % population in poverty (according to US Census); continuous scale  
+4.  Census_Poverty_County_2016_ln_poverty_rate_scale_A.pdf: Map of % population in poverty (according to US Census); logged, continuous scale  
+5.  Census_Poverty_County_2016_poverty_rate_A.pdf: Map of % population in poverty (according to US Census); discrete scale  
+6.  Census_Poverty_County_2016_poverty_rate_scale_A.pdf: Map of % population in poverty (according to US Census); discrete scale of logged rate  
+7.  Census_rural_2010_s_USA_A.pdf: Map of % rural population by state using US Census data; color option A  
+8.  Census_rural_2010_s_USA_B.pdf: Map of % rural population by state using US Census data; color option B  
+9.  Census_rural_2010_s_USA_D.pdf: Map of % rural population by state using US Census data; color option D  
+10.  Census_rural_2010_USA_A.pdf: Map of % rural population by county using US Census data; color option A  
+11.  Census_rural_2010_USA_B.pdf: Map of % rural population by county using US Census data; color option B  
+12.  Census_rural_2010_USA_D.pdf: Map of % rural population by county using US Census data; color option D  
+13.  USDA_EconType_2013_USA.pdf: Map of Econ typology from USDA  
+14.  USDA_EconType_Alt1_2013_USA.pdf: Map of Econ typology from USDA; alternative color option 1  
+15.  USDA_EconType_Alt2_2013_USA.pdf: Map of Econ typology from USDA; alternative color option 2  
+16.  USDA_Low_Edu_2013_USA.pdf: Map of Low education indicator from USDA  
+17.  USDA_Low_Employment_2013_USA.pdf: Map of Low employment indicator from USDA  
+18.  USDA_Persistant_Child_Poverty_2013_USA.pdf: Map of Persistant Child Poverty indicator from USDA  
+19.  USDA_Persistant_Poverty_2013_USA.pdf: Map of Persistant Poverty indicator from USDA   
+20.  USDA_Pop_Loss_2010_USA.pdf: Map of population loss indicator from USDA  
+21.  USDA_Retirement_Dest_2013_USA.pdf: Map of retirement destination indicator from USDA  
+22.  USDA_RUCC_2013_USA_A.pdf: Map of RUCC from USDA; color option A  
+23.  USDA_RUCC_2013_USA_B.pdf: Map of RUCC from USDA; color option B
+24.  USDA_RUCC_2013_USA_D.pdf: Map of RUCC from USDA; color option D
+25.  USDA_UIC_2013_USA_A.pdf: Map of RUCC from USDA; color option A
+26.  USDA_UIC_2013_USA_B.pdf: Map of RUCC from USDA; color option B
+27.  USDA_UIC_2013_USA_D.pdf: Map of RUCC from USDA; color option D
+28.  USDA_UIC6_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with UIC > 5
+29.  USDA_UIC7_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with UIC > 6
+30.  USDA_UIC8_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with UIC > 7
+31.  USDA_UIC9_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with UIC > 8
+32.  USDA_URCC4_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with RUCC > 3
+33.  USDA_URCC5_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with RUCC > 4
+34.  USDA_URCC6_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with RUCC > 5
+35.  USDA_URCC7_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with RUCC > 6
+36.  Compare_UIC_v_Census_Rural.pdf: Plot USDA scale (UIC) against Census % rural by county.  
+37.  Compare_RUCC_v_Census_Rural.pdf: Plot USDA scale (RUCC) against Census % rural by county.  
 
 
 ## More Information
