@@ -48,7 +48,7 @@ The following files and folders are stored here: "ps239T-final-project\Geo_Proje
 	- Plot Rural-Urban Continuum Codes (RUCC) - nonmetropolitan counties by degree of urbanization and adjacency to a metro area (https://www.ers.usda.gov/data-products/rural-urban-continuum-codes/).  
 	- Plot Urban Influence Codes (UIC) - distinguishes nonmetropolitan counties by size of the largest city or town and proximity to metro and micropolitan areas (https://www.ers.usda.gov/data-products/urban-influence-codes.aspx).  
 	- Plot County Typology  Codes - six mutually exclusive categories of economic dependence and six overlapping categories of policy-relevant themes
-5. 04_Census_Map_Density.Rmd - Opens data from USDA and Census; create maps of poverty data.  
+5. 04_Census_Map_Density.Rmd - Opens data from USDA and Census; create maps of population density data.  
 6. 05_Census_Map_Poverty.Rmd - Collects data from Census using API and tidycensus; create maps of poverty data.  
 
 
