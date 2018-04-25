@@ -543,61 +543,66 @@ plot_USDA(number = 9,
 
 ### Comparing USDA scales to Census rural designation
 
-# UIC vs. Census (plot then save)
-ggplot(county_data, aes(x=UIC_2013, y=percent_rural)) + 
-  geom_point(shape = 21, alpha=.5) +
-  geom_smooth(method = "lm",
-              span = .1,  # Add fitted line 
-              formula = y ~ x, #Source: http://ggplot2.tidyverse.org/reference/geom_smooth.html
-              se = TRUE, 
-              color="red") + 
-  ggtitle("All Counties, UIC (USDA) vs. %Rural (Census)") +
-  my_theme
+### Create function for plotting by state
+plot_comparison <- function(scale, dat, scale_name, geo_scope){
+  plot1 <- ggplot(dat, aes_string(x=scale, y="percent_rural")) + 
+    geom_point(aes(size = total_pop/1000000),
+               shape = 21, alpha=.5) +
+    geom_smooth(method = "lm",
+                span = .1,  # Add fitted line 
+                formula = y ~ x, #Source: http://ggplot2.tidyverse.org/reference/geom_smooth.html
+                se = FALSE, 
+                color="red") + 
+    ggtitle(paste0(geo_scope," Counties, ",scale_name," (USDA) vs. %Rural (Census)")) +
+    my_theme +
+    scale_y_continuous(name = "Percent Rural", 
+                     breaks = c(0,20,40,60,80,100),
+                     labels = c("0%","20%","40%","60%","80%","100%"),
+                     limits = c(0,100)) +
+    scale_x_continuous(name = scale_name, 
+                     breaks = c(1,2,3,4,5,6,7,8,9,10,11,12),
+                     labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12")) +
+    scale_size("Population Size (millions)")
 
-ggsave(paste0(file_path_proj,"Output/Compare_UIC_v_Census_Rural.pdf"), 
-       plot = last_plot(), device = "pdf")
+ggsave(paste0(file_path_proj,"Output/Compare_",scale_name,"_v_Census_Rural_",geo_scope,".pdf"), 
+       plot = last_plot(), device = "pdf",
+       width = 8, height = 5, units = c("in"))
+  
+  return(plot1)
+}
 
-# RUCC vs. Census (plot then save)
-ggplot(county_data, aes(x=RUCC_2013, y=percent_rural)) + 
-  geom_point(shape = 21, alpha=.5) +
-  geom_smooth(method = "lm",
-              span = .1,  # Add fitted line 
-              formula = y ~ x, #Source: http://ggplot2.tidyverse.org/reference/geom_smooth.html
-              se = TRUE, 
-              color="red") + 
-  ggtitle("All Counties, RUCC (USDA) vs. %Rural (Census)") +
-  my_theme
+?ggsave
 
-ggsave(paste0(file_path_proj,"Output/Compare_RUCC_v_Census_Rural.pdf"), 
-       plot = last_plot(), device = "pdf")
+### URCC Maps
+plot_comparison(scale = "RUCC_2013", 
+                scale_name = "RUCC",
+                dat = county_data,
+                geo_scope = "USA")
+
+### UIC Maps
+plot_comparison(scale = "UIC_2013", 
+                scale_name = "UIC",
+                dat = county_data,
+                geo_scope = "USA")
 
 
-
-### What's going on with Colorado?
-# Colorado is the most noticable difference between Census and USDA estimates in the above plots 
-co_data <- county_data %>%
+### What's going on with Wyoming?
+# Wyoming is the most noticable difference between Census and USDA estimates in the above plots 
+wy_data <- county_data %>%
   select(abb, UIC_2013, RUCC_2013, total_pop, percent_rural) %>%
-  filter(abb=="CO")
+  filter(abb=="WY")
 
-ggplot(co_data, aes(x=UIC_2013, y=percent_rural)) + 
-  geom_point(shape = 21, alpha=.5) +
-  geom_smooth(method = "lm",
-              span = .1,  # Add fitted line 
-              formula = y ~ x, #Source: http://ggplot2.tidyverse.org/reference/geom_smooth.html
-              se = TRUE, 
-              color="red") + 
-  ggtitle("CO Counties, UIC vs. %Rural") +
-  my_theme
+### URCC Maps
+plot_comparison(scale = "RUCC_2013", 
+                scale_name = "RUCC",
+                dat = wy_data,
+                geo_scope = "WY")
 
-ggplot(co_data, aes(x=RUCC_2013, y=percent_rural)) + 
-  geom_point(shape = 21, alpha=.5) +
-  geom_smooth(method = "lm",
-              span = .1,  # Add fitted line 
-              formula = y ~ x, #Source: http://ggplot2.tidyverse.org/reference/geom_smooth.html
-              se = TRUE, 
-              color="red") + 
-  ggtitle("CO Counties, URCC vs. %Rural") +
-  my_theme
+### UIC Maps
+plot_comparison(scale = "UIC_2013", 
+                scale_name = "UIC",
+                dat = wy_data,
+                geo_scope = "WY")
 
 ```
 
