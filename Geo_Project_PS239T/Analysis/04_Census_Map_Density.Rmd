@@ -585,6 +585,18 @@ plot_comparison(scale = "UIC_2013",
                 dat = county_data,
                 geo_scope = "USA")
 
+### URCC Maps
+plot_comparison(scale = "RUCC_2013", 
+                scale_name = "RUCC",
+                dat = filter(county_data, RUCC_2013 > 3),
+                geo_scope = "USA_rural")
+
+### UIC Maps
+plot_comparison(scale = "UIC_2013", 
+                scale_name = "UIC",
+                dat = filter(county_data, UIC_2013 > 3),
+                geo_scope = "USA_rural")
+
 
 ### What's going on with Wyoming?
 # Wyoming is the most noticable difference between Census and USDA estimates in the above plots 
