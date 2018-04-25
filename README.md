@@ -89,8 +89,10 @@ The following files and folders are stored here: "ps239T-final-project\Geo_Proje
 33.  USDA_URCC5_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with RUCC > 4
 34.  USDA_URCC6_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with RUCC > 5
 35.  USDA_URCC7_rural_2010_USA_B.pdf: Map of estimated % rural population by state; defines rural population as people in counties with RUCC > 6
-36.  Compare_UIC_v_Census_Rural.pdf: Plot USDA scale (UIC) against Census % rural by county.  
-37.  Compare_RUCC_v_Census_Rural.pdf: Plot USDA scale (RUCC) against Census % rural by county.  
+36.  Compare_UIC_v_Census_Rural_USA.pdf: Plot USDA scale (UIC) against Census % rural by county.  
+37.  Compare_RUCC_v_Census_Rural_USA.pdf: Plot USDA scale (RUCC) against Census % rural by county.  
+36.  Compare_UIC_v_Census_Rural_WY.pdf: Plot USDA scale (UIC) against Census % rural by county in Wyoming.  
+37.  Compare_RUCC_v_Census_Rural_WY.pdf: Plot USDA scale (RUCC) against Census % rural by county in Wyoming.  
 
 
 ## More Information
