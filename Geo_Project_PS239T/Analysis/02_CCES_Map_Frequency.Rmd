@@ -1,0 +1,189 @@
+---
+title: "CCES Coverage"
+author: "Julia Christensen"
+date: "April 9, 2018"
+output: html_document
+---
+
+# PURPOSE OF SCRIPT:
+1. Opens cumulative CCES files.  
+2. Calculate number of CCES repondents by county.  
+3. Plot number of CCES repondents by county.  
+4. Repeat #2 and #3 for each state 
+
+
+# Initial Set Up
+
+- Note: Run CCES_Download_Data first to download and format cces data
+
+```{r setup, include=TRUE}
+
+### Clear global environment
+rm(list=ls()) 
+
+### Libraries:
+library(pacman)
+p_load(tidyverse, foreign, readstata13, readr, haven, foreign, 
+       magrittr, mapproj, ggmap, #DeducerSpatial,
+       rgdal, RColorBrewer, data.table, tmap, 
+       maptools, tmaptools)
+
+
+### File Locations
+file_path_root <- "C:/Users/Julia/OneDrive/Documents/Berkeley/2018_Spring/PS239T_Intro_to_Comp_Tools/ps239T-final-project/"
+file_path_proj <- paste0(file_path_root,"Geo_Project_PS239T/")
+file_path_dat <- paste0(file_path_root,"Data_Geo_Sophistication/")
+
+### Set theme
+my_theme <- theme(
+  legend.position = "bottom",
+  panel.background = element_rect(fill = NA),
+  panel.border = element_rect(fill = NA, color = "grey75"),
+  axis.ticks = element_line(color = "grey85"),
+  panel.grid.major = element_line(color = "grey95", size = 0.2),
+  panel.grid.minor = element_line(color = "grey95", size = 0.2),
+  legend.key = element_blank())
+
+```
+
+*****************************************************************
+
+# Load CCES Data
+
+```{r}
+
+### Load RData file with Cumulative CCES dataset
+load(file = paste0(file_path_proj,"Data_R/cess_cum.RData"))
+
+```
+
+
+*****************************************************************
+
+# Plotting CCES Respondents by County
+
+## Download and Clean Map Data
+
+```{r}
+
+### Generate Count Data by County
+cces_count <- cces_dat %>% 
+  group_by(county_fips) %>%
+  summarize(count=n()) %>%
+  dplyr::arrange(desc(count)) #%>% print()
+
+### Merge with Map Data
+setwd(paste0(file_path_dat,"USDA_Shapefile/"))
+US.counties <- readOGR(dsn=".",layer="gz_2010_us_050_00_5m")
+US.counties <- US.counties[!(US.counties$STATE %in% c("72")),]  #Remove Puetro Rico
+county.data <- US.counties@data
+county.data <- cbind(id=rownames(county.data),county.data)
+county.data <- data.table(county.data)
+county.data[,FIPS:=paste0(STATE,COUNTY)] # this is the state + county FIPS code
+
+setkey(county.data,FIPS)     
+cces_count$FIPS <- cces_count$county_fips 
+cces_count <- data.table(cces_count)
+setkey(cces_count,FIPS)
+county.data[cces_count,count:=count]
+
+map.df <- data.table(fortify(US.counties))
+setkey(map.df,id)
+setkey(county.data,id)
+map.df[county.data, count:=count]
+
+setkey(map.df,id)
+setkey(county.data,id)
+map.df[county.data,  state:=STATE]
+
+### Set Buckets
+
+map.df$count <- ifelse(is.na(map.df$count),0,map.df$count)
+
+map.df$count_scale <- as.factor(cut(map.df$count, 
+                                     c(-1, 0, 10, 30, 50, 100, 10000)))
+
+map.df %>% distinct(count_scale)
+
+```
+
+## Generate Map for USA
+
+```{r}
+
+### Subset to mainland USA
+#leave out AK, HI, and PR (state FIPS: 02, 15, and 72)
+map.df.usa <- map.df[!(map.df$state %in% c("02","15","72")),]
+
+### Save County and State Lines
+county_map <- map_data("county")
+state_map <- map_data("state")
+
+### Map for USA
+ggplot(map.df.usa, aes(x=long, y=lat, group=group)) +
+  scale_fill_brewer(palette = "RdYlBu", drop=FALSE, 
+                    labels = c("0", "1-10", "11-30", "31-50", "51-100", "100+")) +
+  geom_polygon(aes(fill = count_scale)) + 
+  geom_path(data = state_map , colour = "white", size=.1) + #Add state lines
+  coord_quickmap() +
+  labs(title="CCES Responses by County (2006-2016)", x="", y="") +
+  theme_void()
+
+### Save map for USA
+ggsave(paste0(file_path_proj,"Output/cces_count_USA.pdf"), 
+       plot = last_plot(), #Saves last plot
+       device = "pdf")
+
+```
+
+*****************************************************************
+
+## Generate Maps for Each U.S. State
+
+```{r}
+
+### Cross Walk for FIPS codes and States
+state_fips <- read.table(paste0(file_path_dat,"FIPS_state_codes/state_fips_codes.csv"), 
+                         header=TRUE, 
+                         sep=",", 
+                         colClasses=c("character", "character", "character"))
+
+
+### Leave out American Samoa, Virgin Islands, Guam, and PR (state FIPS: 60, 78, 66, and 72)
+state_fips <- state_fips[!(state_fips$FIPS.Code %in% c("72","60","78","66")),]  
+#Note: AK and HI will still not print properly (they will be really small)
+
+
+### Function for Generateing State Maps
+cces_count_state_fun <- function(dat ,state_name, state_code){
+  # Create ggplot
+  plot <- ggplot(filter(dat, state == as.character(state_code)), #Filter to selected state
+       aes(x=long, y=lat, group=group)) +
+  scale_fill_brewer(palette = "RdYlBu", drop=FALSE, 
+                    labels = c("0", "1-10", "11-30", "31-50", "51-100", "100+")) +
+  geom_polygon(aes(fill = count_scale), colour = "white", size=.1) + #Add county lines
+  coord_quickmap() +
+  labs(title=paste0(state_name," CCES Responses by County (2006-2016)"), x="", y="") +
+  theme_void()
+  # Return plot
+  return(plot)
+}
+
+
+### Generate State maps by looping over each state
+for(i in 1:51){
+  # Save state names and abbreviations
+  name <- state_fips$State.Name[i]
+  code <- state_fips$FIPS.Code[i]
+  # Generate map 
+  ploti <- cces_count_state_fun(dat = map.df, 
+                                state_name = name, 
+                                state_code = code)
+  # Save Map
+  ggsave(paste0(file_path_proj,"Output/CCES_Count_States/cces_count_",name,".pdf"), 
+         plot = ploti, 
+         device = "pdf")
+}
+
+```
+

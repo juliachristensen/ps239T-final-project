@@ -1,0 +1,416 @@
+---
+title: "Mapping USDA Data"
+author: "Julia Christensen"
+date: "April 9, 2018"
+output: html_document
+---
+
+# PURPOSE OF SCRIPT:
+1. Opens three USDA files.  
+2. Plot Rural-Urban Continuum Codes (RUCC) - nonmetropolitan counties by degree of urbanization and adjacency to a metro area (https://www.ers.usda.gov/data-products/rural-urban-continuum-codes/).  
+3. Plot Urban Influence Codes (UIC) - distinguishes nonmetropolitan counties by size of the largest city or town and proximity to metro and micropolitan areas (https://www.ers.usda.gov/data-products/urban-influence-codes.aspx).  
+4. Plot County Typology  Codes - six mutually exclusive categories of economic dependence and six overlapping categories of policy-relevant themes (https://www.ers.usda.gov/data-products/county-typology-codes.aspx).  
+
+
+# Note about 1974 Data:
+
+There have been slight changes to county designations since 1974. Before using map generate here in an official capacity, would need to adjust for differences between borders, etc. in 1974 and shape file used here. For now, 1974 data and plots have been commented out.   
+
+
+# Set Up
+
+```{r setup, include=TRUE}
+
+### Clear global environment
+rm(list=ls()) 
+
+### Libraries:
+library(pacman)
+p_load(tidyverse, foreign, readstata13, readr, haven, foreign, 
+       magrittr, mapproj, ggmap, DeducerSpatial,
+       rgdal, RColorBrewer, data.table, tmap, 
+       maptools, tmaptools, broom, viridis)
+
+
+### File Locations
+file_path_root <- "C:/Users/Julia/OneDrive/Documents/Berkeley/2018_Spring/PS239T_Intro_to_Comp_Tools/ps239T-final-project/"
+file_path_proj <- paste0(file_path_root,"Geo_Project_PS239T/")
+file_path_dat <- paste0(file_path_root,"Data_Geo_Sophistication/")
+
+### Set theme
+my_theme <- theme(
+  legend.position = "bottom",
+  panel.background = element_rect(fill = NA),
+  panel.border = element_rect(fill = NA, color = "grey75"),
+  axis.ticks = element_line(color = "grey85"),
+  panel.grid.major = element_line(color = "grey95", size = 0.2),
+  panel.grid.minor = element_line(color = "grey95", size = 0.2),
+  legend.key = element_blank())
+
+```
+
+
+*****************************************************************
+
+# Load USDA Data
+
+```{r}
+
+### -------------------------------------------------- ###
+### File Locations
+### -------------------------------------------------- ###
+
+# USDA County Urban Influence Scores 
+file_usda_ui <- paste0(file_path_dat,
+                       "County_USDA_Urban_Influence/UrbanInfluenceCodes2013.csv")
+# USDA County Typology (includes econ type) 
+file_usda_tp <- paste0(file_path_dat,
+                       "County_USDA_Typology/ERSCountyTypology2015Edition.csv")
+# USDA County Rural Urban Continuum Scores
+file_usda_ru <- paste0(file_path_dat,
+                       "County_USDA_Rural-Urban_Continuum/ruralurbancodes2013.csv")
+# # USDA County Rural Urban Continuum Scores from 1974
+# file_usda_ru74 <- paste0(file_path_dat,
+#                        "County_USDA_Rural-Urban_Continuum/ruralurbancodes1974.csv")
+
+### -------------------------------------------------- ###
+### Download & Combine Data
+### -------------------------------------------------- ###
+
+### USDA Urban Influence
+usda_ui <- read.csv(file = file_usda_ui, 
+                      header=TRUE, sep=",") %>% 
+  select(-State,-County_Name) %>%
+  rename(UIC_Descr = Description)
+
+### USDA Typology
+usda_tp <- read.csv(file = file_usda_tp, 
+                      header=TRUE, sep=",") #%>% 
+  #select(-State,-County_name)
+
+### USDA Rural-Urban
+usda_ru <- read.csv(file = file_usda_ru, 
+                      header=TRUE, sep=",") %>% 
+  select(-State,-County_Name, -Population_2010) %>%
+  rename(RUCC_Descr = Description)
+
+# usda_ru74 <- read.csv(file = file_usda_ru74, 
+#                       header=TRUE, sep=",") %>% 
+#   mutate(FIPS = as.integer(as.character(FIPS.Code))) %>% 
+#   rename(RUCC_1974 = X1974.Rural.urban.Continuum.Code) %>%
+#   select(FIPS, RUCC_1974) %>%
+#   filter(!is.na(FIPS))
+  
+### Combine USDA Data
+usda_all <- full_join(x = usda_ui, 
+                      y = usda_tp, 
+                      by = "FIPS")
+usda_all <- full_join(x = usda_all, 
+                      y = usda_ru, 
+                      by = "FIPS")
+# usda_all <- full_join(x = usda_all,
+#                       y = usda_ru74, 
+#                       by = "FIPS")
+
+# glimpse(usda_all)
+
+```
+
+
+*****************************************************************
+
+# Set Up Map File
+
+```{r}
+
+### -------------------------------------------------- ###
+### Merge USDA Data with Map Data
+### -------------------------------------------------- ###
+
+### Download Map Data
+setwd(paste0(file_path_dat,"USDA_Shapefile/"))
+US_counties <- readOGR(dsn=".",layer="gz_2010_us_050_00_5m")
+#leave out AK, HI, and PR (state FIPS: 02, 15, and 72)
+#US.counties <- US.counties[!(US.counties$STATE %in% c("72")),]  #"02","15",
+county_data <- US_counties@data
+county_data <- cbind(id=rownames(county_data),county_data)
+county_data <- as_tibble(county_data)
+county_data %<>% mutate(FIPS = as.integer(paste0(STATE,COUNTY)))
+
+### Joing Map data wth USDA Data
+county_data <- left_join(x = county_data, 
+                         y = usda_all, 
+                         by = "FIPS")
+
+map_df <- data.table(broom::tidy(US_counties)) 
+map_df <- left_join(x = map_df, 
+                         y = county_data, 
+                         by = "id")
+
+### Subset to mainland USA
+map_df_usa <- map_df[!(map_df$STATE %in% c("02","15","72")),]  
+
+### County and State Borders
+map_county <- map_data("county")
+map_state <- map_data("state")
+
+```
+
+*****************************************************************
+
+# Maps - UIC
+
+Note for scale_fill_viridis()  
+Option - A character string indicating the colormap option to use. Four options are available: "magma" (or "A"), "inferno" (or "B"), "plasma" (or "C"), and "viridis" (or "D", the default option).  
+
+```{r}
+
+### Define Labels (Unused at the moment)
+labels_ui <- c("1"="Metro, Large",
+               "2"="Metro, Small",
+               "3"="Micro, Adj Large Metro",
+               "4"="Noncore, Adj Large Metro",
+               "5"="Micro, Adj Small Metro",
+               "6"="Noncore (town>2.5k), Adj Large Metro",
+               "7"="Noncore (town<2.5k), Adj Large Metro",
+               "8"="Micro, Not Adj",
+               "9"="Noncore (town>2.5k), Adj Micro",
+               "10"="Noncore (town<2.5k), Adj Micro",
+               "11"="Noncore (town>2.5k), Adj Noncore",
+               "12"="Noncore (town<2.5k), Adj Noncore")
+
+### Plot for 2013 UIC
+#plot_ui2013 <- 
+
+plot_ui2013 <- ggplot(map_df_usa, aes(x=long, y=lat, group=group)) +
+  geom_polygon(aes(fill = UIC_2013)) +
+  geom_path(data = map_state , colour = "white", size=.1) +
+  coord_quickmap() +
+  labs(title="USDA Urban Influence Codes by County (2013)", x="", y="") +
+  theme_void() 
+
+plot_ui2013_A <- plot_ui2013 + 
+  scale_fill_viridis(option="A", direction=1)
+plot_ui2013_B <- plot_ui2013 + 
+  scale_fill_viridis(option="B", direction=1)
+plot_ui2013_D <- plot_ui2013 + 
+  scale_fill_viridis(option="D", direction=1)
+
+plot_ui2013_A
+plot_ui2013_B
+plot_ui2013_D
+
+ggsave(paste0(file_path_proj,"Output/USDA_UIC_2013_USA_A.pdf"), 
+       plot = plot_ui2013_A, device = "pdf")
+ggsave(paste0(file_path_proj,"Output/USDA_UIC_2013_USA_B.pdf"), 
+       plot = plot_ui2013_B, device = "pdf")
+ggsave(paste0(file_path_proj,"Output/USDA_UIC_2013_USA_D.pdf"), 
+       plot = plot_ui2013_D, device = "pdf")
+
+```
+
+*****************************************************************
+
+# Maps - URCC
+
+```{r}
+
+### Define Labels 
+labels_ru <- c("1"="Metro (>1000k)",
+               "2"="Metro (250-1000k)",
+               "3"="Metro (250-1000k)",
+               "4"="Non-Metro (Adj=Y; >20k)",
+               "5"="Non-Metro (Adj=N; >20k)",
+               "6"="Non-Metro, MAdj (Adj=Y; 2.5-20k)",
+               "7"="Non-Metro (Adj=N; 2.5-20k)",
+               "8"="Rural (Adj=Y; <2.5k)",
+               "9"="Rural (Adj=N; <2.5k)")
+
+
+### Plot for 2013 URCC
+plot_ur2013 <- ggplot(map_df_usa, aes(x=long, y=lat, group=group)) +
+  geom_polygon(aes(fill = as.factor(RUCC_2013))) +
+  geom_path(data = map_state , colour = "white", size=.1) +
+  #scale_fill_brewer(palette = "RdYlGn", direction=-1, #YlOrBr
+  #                  drop=FALSE, labels = labels_ru) +
+  coord_quickmap() +
+  labs(title="USDA Rural-Urban Continuum by County (2013)", x="", y="") +
+  theme_void() 
+
+plot_ur2013_A <- plot_ur2013 + 
+  scale_fill_viridis(option="A", direction=1, discrete=T)
+plot_ur2013_B <- plot_ur2013 + 
+  scale_fill_viridis(option="B", direction=1, discrete=T)
+plot_ur2013_D <- plot_ur2013 + 
+  scale_fill_viridis(option="D", direction=1, discrete=T)
+
+plot_ur2013_A
+plot_ur2013_B
+plot_ur2013_D
+
+ggsave(paste0(file_path_proj,"Output/USDA_RUCC_2013_USA_A.pdf"), 
+       plot = plot_ur2013_A, device = "pdf")
+ggsave(paste0(file_path_proj,"Output/USDA_RUCC_2013_USA_B.pdf"), 
+       plot = plot_ur2013_B, device = "pdf")
+ggsave(paste0(file_path_proj,"Output/USDA_RUCC_2013_USA_D.pdf"), 
+       plot = plot_ur2013_D, device = "pdf")
+
+# ### Plot for 1974 URCC
+# plot_ur1974 <- ggplot(map_df_usa, aes(x=long, y=lat, group=group)) +
+#   geom_polygon(aes(fill = as.factor(RUCC_1974))) +
+#   geom_path(data = map_state , colour = "white", size=.1) +
+#   #scale_fill_brewer(palette = "RdYlGn", direction=-1,
+#   #                  drop=FALSE, labels = labels_ru) +
+#   coord_quickmap() +
+#   labs(title="USDA Rural-Urban Continuum by County (1974)", x="", y="") +
+#   theme_void() 
+# 
+# plot_ur1974_A <- plot_ur1974 + 
+#   scale_fill_viridis(option="A", direction=1, discrete=T) 
+# plot_ur1974_B <- plot_ur1974 + 
+#   scale_fill_viridis(option="B", direction=1, discrete=T) 
+# plot_ur1974_D <- plot_ur1974 + 
+#   scale_fill_viridis(option="D", direction=1, discrete=T) 
+# 
+# plot_ur1974_A
+# plot_ur1974_B
+# plot_ur1974_D
+# 
+# ggsave(paste0(file_path_proj,"Output/USDA_RUCC_1974_USA_A.pdf"), 
+#        plot = plot_ur1974_A, device = "pdf")
+# ggsave(paste0(file_path_proj,"Output/USDA_RUCC_1974_USA_B.pdf"), 
+#        plot = plot_ur1974_B, device = "pdf")
+# ggsave(paste0(file_path_proj,"Output/USDA_RUCC_1974_USA_D.pdf"), 
+#        plot = plot_ur1974_D, device = "pdf")
+
+```
+
+
+*****************************************************************
+
+# Maps - Econ Type
+
+```{r}
+
+### Turn Dummies into Factor
+map_df_usa %<>% mutate(Econ_Type="Other") %>%
+  mutate(Econ_Type=ifelse(map_df_usa$Farming==1,"Farming",Econ_Type)) %>%
+  mutate(Econ_Type=ifelse(map_df_usa$Mining==1,"Mining",Econ_Type)) %>%
+  mutate(Econ_Type=ifelse(map_df_usa$Manufacturing==1,"Manufacturing",Econ_Type)) %>%
+  mutate(Econ_Type=ifelse(map_df_usa$Government==1,"Government",Econ_Type)) %>%
+  mutate(Econ_Type=ifelse(map_df_usa$Recreation==1,"Recreation",Econ_Type)) %>%
+  mutate(Econ_Type=ifelse(map_df_usa$Nonspecialized==1,"Nonspecialized",Econ_Type)) 
+
+### Plot for 2013 Econ Type
+plot_tp2013 <- ggplot(map_df_usa, aes(x=long, y=lat, group=group)) +
+  geom_polygon(aes(fill = Econ_Type)) +
+  geom_path(data = map_state , colour = "white", size=.1) +
+  #scale_fill_brewer(palette = "Set1", direction=-1,
+  #                  drop=FALSE) +
+  coord_quickmap() +
+  labs(title="USDA Econ Type by County (2013)", x="", y="") +
+  theme_void() 
+
+plot_tp2013 <- plot_tp2013 + 
+  scale_fill_manual(values=c("Farming"="#ffd92f",
+                             "Mining"="#6a3d9a",
+                             "Manufacturing"="#e31a1c",
+                             "Government"="#cab2d6",
+                             "Recreation"="#33a02c",
+                             "Nonspecialized"="#f0f0f0"))
+
+plot_tp2013_alt1 <- plot_tp2013 + 
+  scale_fill_brewer(palette = "Set1", direction=-1, drop=FALSE)
+
+plot_tp2013_alt2 <- plot_tp2013 + 
+  scale_fill_brewer(palette = "Set3", direction=-1, drop=FALSE)
+
+ggsave(paste0(file_path_proj,"Output/USDA_EconType_2013_USA.pdf"), 
+       plot = plot_tp2013, device = "pdf")
+ggsave(paste0(file_path_proj,"Output/USDA_EconType_Alt1_2013_USA.pdf"), 
+       plot = plot_tp2013_alt1, device = "pdf")
+ggsave(paste0(file_path_proj,"Output/USDA_EconType_Alt2_2013_USA.pdf"), 
+       plot = plot_tp2013_alt2, device = "pdf")
+
+```
+
+
+*****************************************************************
+
+# Maps - Other Econ Fields
+
+```{r}
+
+### Plot for 2013 Low_Edu
+ggplot(map_df_usa, aes(x=long, y=lat, group=group)) +
+  geom_polygon(aes(fill = as.factor(Low_Edu))) +
+  geom_path(data = map_state , colour = "grey", size=.1) +
+  scale_fill_manual(values=c("1"="#525252","0"="#f7f7f7")) +
+  coord_quickmap() +
+  labs(title="USDA Low Education by County (2013)", x="", y="") +
+  theme_void() 
+
+ggsave(paste0(file_path_proj,"Output/USDA_Low_Edu_2013_USA.pdf"), 
+       plot = last_plot(), device = "pdf")
+
+### Plot for 2013 Low_Employment
+ggplot(map_df_usa, aes(x=long, y=lat, group=group)) +
+  geom_polygon(aes(fill = as.factor(Low_Employment))) +
+  geom_path(data = map_state , colour = "grey", size=.1) +
+  scale_fill_manual(values=c("1"="#525252","0"="#f7f7f7")) +
+  coord_quickmap() +
+  labs(title="USDA Low Employment by County (2013)", x="", y="") +
+  theme_void() 
+
+ggsave(paste0(file_path_proj,"Output/USDA_Low_Employment_2013_USA.pdf"), 
+       plot = last_plot(), device = "pdf")
+
+### Plot for 2013 Retirement_Dest
+ggplot(map_df_usa, aes(x=long, y=lat, group=group)) +
+  geom_polygon(aes(fill = as.factor(Retirement_Dest))) +
+  geom_path(data = map_state , colour = "grey", size=.1) +
+  scale_fill_manual(values=c("1"="#525252","0"="#f7f7f7")) +
+  coord_quickmap() +
+  labs(title="USDA Retirement Destination by County (2013)", x="", y="") +
+  theme_void() 
+
+ggsave(paste0(file_path_proj,"Output/USDA_Retirement_Dest_2013_USA.pdf"), 
+       plot = last_plot(), device = "pdf")
+
+### Plot for 2013 Pop_Loss_2010
+ggplot(map_df_usa, aes(x=long, y=lat, group=group)) +
+  geom_polygon(aes(fill = as.factor(Pop_Loss_2010))) +
+  geom_path(data = map_state , colour = "grey", size=.1) +
+  scale_fill_manual(values=c("1"="#525252","0"="#f7f7f7")) +
+  coord_quickmap() +
+  labs(title="USDA Population Loss by County (2010)", x="", y="") +
+  theme_void() 
+
+ggsave(paste0(file_path_proj,"Output/USDA_Pop_Loss_2010_USA.pdf"), 
+       plot = last_plot(), device = "pdf")
+
+### Plot for 2013 Persistant_Poverty_2013
+ggplot(map_df_usa, aes(x=long, y=lat, group=group)) +
+  geom_polygon(aes(fill = as.factor(Persistant_Poverty_2013))) +
+  geom_path(data = map_state , colour = "grey", size=.1) +
+  scale_fill_manual(values=c("1"="#525252","0"="#f7f7f7")) +
+  coord_quickmap() +
+  labs(title="USDA Persistant Poverty by County (2013)", x="", y="") +
+  theme_void() 
+
+ggsave(paste0(file_path_proj,"Output/USDA_Persistant_Poverty_2013_USA.pdf"), 
+       plot = last_plot(), device = "pdf")
+
+### Plot for 2013 Persistent_Child_Poverty_2013
+ggplot(map_df_usa, aes(x=long, y=lat, group=group)) +
+  geom_polygon(aes(fill = as.factor(Persistent_Child_Poverty_2013))) +
+  geom_path(data = map_state , colour = "grey", size=.1) +
+  scale_fill_manual(values=c("1"="#525252","0"="#f7f7f7")) +
+  coord_quickmap() +
+  labs(title="USDA Persistant Child Poverty by County (2013)", x="", y="") +
+  theme_void() 
+
+ggsave(paste0(file_path_proj,"Output/USDA_Persistant_Child_Poverty_2013_USA.pdf"), 
+       plot = last_plot(), device = "pdf")
+
+```

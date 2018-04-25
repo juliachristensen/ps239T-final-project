@@ -1,0 +1,227 @@
+---
+title: "Mapping Census Data"
+author: "Julia Christensen"
+date: "April 23, 2018"
+output: html_document
+---
+
+# PURPOSE OF SCRIPT:
+1. Download Census data.  
+2. Calculate poverty rate statistics.   
+3. Plot poverty rate statistics.  
+
+
+# Set Up
+
+```{r setup, include=TRUE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+### Clear global environment
+rm(list=ls()) 
+
+### Libraries:
+library(pacman)
+p_load(tidyverse, foreign, readstata13, readr, haven, foreign, 
+       magrittr, mapproj, ggmap, ggthemes, #DeducerSpatial,
+       rgdal, RColorBrewer, data.table, tmap, 
+       #maptools, tmaptools, 
+       broom, viridis, 
+       tidycensus, census)
+
+### Store API Key (for tidycensus package)
+# Get API Key here: https://api.census.gov/data/key_signup.html
+jbc_census_api_key <- "[INSERT KEY HERE]"
+tidycensus::census_api_key(key = jbc_census_api_key, 
+                           overwrite = FALSE, 
+                           install = FALSE)
+
+### File Locations
+file_path_root <- "C:/Users/Julia/OneDrive/Documents/Berkeley/2018_Spring/PS239T_Intro_to_Comp_Tools/ps239T-final-project/"
+file_path_proj <- paste0(file_path_root,"Geo_Project_PS239T/")
+file_path_dat <- paste0(file_path_root,"Data_Geo_Sophistication/")
+
+### Set theme
+my_theme <- theme(
+  legend.position = "bottom",
+  panel.background = element_rect(fill = NA),
+  panel.border = element_rect(fill = NA, color = "grey75"),
+  axis.ticks = element_line(color = "grey85"),
+  panel.grid.major = element_line(color = "grey95", size = 0.2),
+  panel.grid.minor = element_line(color = "grey95", size = 0.2),
+  legend.key = element_blank())
+
+```
+
+
+*****************************************************************
+
+# Load Census Poverty Data
+
+## Using Tidycensus R package and census API
+
+Sources:  
+https://walkerke.github.io/tidycensus/articles/spatial-data.html  
+https://www.pdx.edu/prc/sites/www.pdx.edu.prc/files/06_pragmatic_tidy.pdf  
+http://knaaptime.com/projects/neighborhood-types/opportunity-types-in-r/  
+http://dlab.berkeley.edu/blog/season-sharing-data-working-newly-released-census-2010-2014-acs-5-year-data-r  
+https://www.gl-li.com/  
+https://factfinder.census.gov/faces/nav/jsf/pages/index.xhtml  
+http://edrub.in/ARE212/section12.html#spatial_data  
+https://edzer.github.io/UseR2017/  
+
+```{r}
+### ---
+### Download
+#B17001_002 refers to the total number of people in poverty and 
+#B17001_0011 refers to the total number of people for whom poverty status is determined
+### ---
+
+### Download Data
+data(state)
+
+# Set Variables
+pov_vars <- c(total_pop_denom = "B17001_001",
+              total_pov = "B17001_002")
+
+pov_var_sum <- c("B17001_001")
+
+# Use tidycensus
+pov_data_county <- get_acs(geography = "county", #could do "tract"
+                                variables = pov_vars,
+                                #summary_var = pov_var_sum,
+                                #state = state.abb,
+                                geometry=FALSE,
+                                year=2016)  %>%
+  mutate(FIPS = as.integer(GEOID)) %>%
+  select(-moe)
+
+# Save and Load data (for when key is missing)
+save(pov_data_county, 
+     file = paste0(file_path_proj,"Data_R/census_2016_poverty.RData"))
+load(paste0(file_path_proj,"Data_R/census_2016_poverty.RData"))
+
+# Covert to wide data
+pov_data_county_wide <- pov_data_county %>% 
+  spread(key = variable,
+         value = estimate)
+
+# Generate versions of poverty rate
+pov_data <- pov_data_county_wide %>%
+  mutate(poverty_rate = (total_pov / total_pop_denom) * 100) %>%
+  mutate(ln_poverty_rate = ifelse(poverty_rate==0, 0, log(poverty_rate))) %>%
+  mutate(poverty_rate_scale = as.factor(cut(poverty_rate,c(0, 10, 20, 30, 40, 100)))) %>%
+  mutate(ln_poverty_rate_scale = as.factor(cut(ln_poverty_rate,c(0, 1, 2, 3, 4)))) %>%
+  print()
+
+
+```
+
+*****************************************************************
+
+# Combine Data
+
+```{r}
+
+### -------------------------------------------------- ###
+### Merge USDA and Census Data with Map Data
+### -------------------------------------------------- ###
+
+### Download Map Data
+setwd(paste0(file_path_dat,"USDA_Shapefile/"))
+US_counties <- readOGR(dsn=".",layer="gz_2010_us_050_00_5m")
+county_data <- US_counties@data
+county_data <- cbind(id=rownames(county_data),county_data)
+county_data <- as_tibble(county_data)
+county_data %<>% mutate(FIPS = as.integer(paste0(STATE,COUNTY)))
+
+### Joining County data wth Census Data
+county_data <- left_join(x = county_data, 
+                         y = pov_data, 
+                         by = "FIPS")
+
+### Create map dataframe
+map_df <- data.table(broom::tidy(US_counties)) 
+map_df <- left_join(x = map_df, 
+                    y = county_data, 
+                    by = "id")
+
+### Subset to mainland USA
+#leave out AK, HI, and PR (state FIPS: 02, 15, and 72)
+map_df_usa <- map_df[!(map_df$STATE %in% c("02","15","72")),]  
+
+### County and State Borders
+map_county <- map_data("county")
+map_state <- map_data("state")
+
+```
+
+
+*****************************************************************
+
+# Maps - Census by State
+
+```{r}
+
+### Create function for plotting continuous vars
+plot_poverty <- function(dat, fill_var, var_title, viridis_option = "A"){
+  
+  plot1 <- ggplot(dat, aes(x=long, y=lat, group=group)) +
+    geom_polygon(aes_string(fill = fill_var)) +
+    geom_path(data = map_state , colour = "white", size=.1) +
+    coord_quickmap() +
+    labs(title=paste0(var_title,", 2016 ACS"), 
+         x="", y="") +
+    theme_void() + 
+    scale_fill_viridis(option=viridis_option, direction=1)
+  
+  ggsave(paste0(file_path_proj,"Output/Census_Poverty_County_2016_",fill_var,"_",viridis_option,".pdf"), 
+       plot = plot1, device = "pdf")
+  
+  return(plot1)
+}
+
+### Create function for plotting discrete vars
+plot_poverty_d <- function(dat, fill_var, var_title, viridis_option = "A"){
+  
+  plot1 <- ggplot(dat, aes(x=long, y=lat, group=group)) +
+    geom_polygon(aes_string(fill = fill_var)) +
+    geom_path(data = map_state , colour = "white", size=.1) +
+    coord_quickmap() +
+    labs(title=paste0(var_title,", 2016 ACS"), 
+         x="", y="") +
+    theme_void() + 
+    scale_fill_viridis_d(option=viridis_option, direction=1)
+  
+  ggsave(paste0(file_path_proj,"Output/Census_Poverty_County_2016_",fill_var,"_",viridis_option,".pdf"), 
+       plot = plot1, device = "pdf")
+  
+  return(plot1)
+}
+
+
+### Map 1 - poverty_rate
+plot_poverty(dat = map_df_usa, 
+             fill_var = "poverty_rate",
+             var_title = "Poverty Rate",
+             viridis_option = "A")
+
+### Map 2 - ln_poverty_rate
+plot_poverty(dat = map_df_usa, 
+             fill_var = "ln_poverty_rate",
+             var_title = "Ln(Poverty Rate)",
+             viridis_option = "A")
+
+### Map 3 - poverty_rate_scale
+plot_poverty_d(dat = map_df_usa, 
+               fill_var = "poverty_rate_scale",
+               var_title = "Poverty Rate",
+               viridis_option = "A")
+
+### Map 4 - ln_poverty_rate_scale
+plot_poverty_d(dat = map_df_usa, 
+               fill_var = "ln_poverty_rate_scale",
+               var_title = "Ln(Poverty Rate)",
+               viridis_option = "A")
+
+```

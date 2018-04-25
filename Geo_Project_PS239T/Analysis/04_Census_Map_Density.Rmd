@@ -1,0 +1,604 @@
+---
+title: "Mapping Census Data"
+author: "Julia Christensen"
+date: "April 23, 2018"
+output: html_document
+---
+
+# PURPOSE OF SCRIPT:
+1. Opens three USDA files.  
+- Plot Rural-Urban Continuum Codes (RUCC) - nonmetropolitan counties by degree of urbanization and adjacency to a metro area (https://www.ers.usda.gov/data-products/rural-urban-continuum-codes/).  
+- Plot Urban Influence Codes (UIC) - distinguishes nonmetropolitan counties by size of the largest city or town and proximity to metro and micropolitan areas (https://www.ers.usda.gov/data-products/urban-influence-codes.aspx).  
+- Plot County Typology  Codes - six mutually exclusive categories of economic dependence and six overlapping categories of policy-relevant themes (https://www.ers.usda.gov/data-products/county-typology-codes.aspx).  
+2. Download Census data.  
+3. Merge USDA and Census data.  
+4. Plot population density.  
+
+
+# Set Up
+
+```{r setup, include=TRUE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+### Clear global environment
+rm(list=ls()) 
+
+### Libraries:
+library(pacman)
+p_load(tidyverse, foreign, readstata13, readr, haven, foreign, 
+       magrittr, mapproj, ggmap, ggthemes, #DeducerSpatial,
+       rgdal, RColorBrewer, data.table, tmap, 
+       #maptools, tmaptools, 
+       broom, viridis, 
+       tidycensus, census)
+
+
+### Store API Key (for tidycensus package)
+# Get API Key here: https://api.census.gov/data/key_signup.html
+jbc_census_api_key <- "[INSERT KEY HERE]"
+tidycensus::census_api_key(key = jbc_census_api_key, 
+                           overwrite = FALSE, 
+                           install = FALSE)
+
+### File Locations
+file_path_root <- "C:/Users/Julia/OneDrive/Documents/Berkeley/2018_Spring/PS239T_Intro_to_Comp_Tools/ps239T-final-project/"
+file_path_proj <- paste0(file_path_root,"Geo_Project_PS239T/")
+file_path_dat <- paste0(file_path_root,"Data_Geo_Sophistication/")
+
+### Set theme
+my_theme <- theme(
+  legend.position = "bottom",
+  panel.background = element_rect(fill = NA),
+  panel.border = element_rect(fill = NA, color = "grey75"),
+  axis.ticks = element_line(color = "grey85"),
+  panel.grid.major = element_line(color = "grey95", size = 0.2),
+  panel.grid.minor = element_line(color = "grey95", size = 0.2),
+  legend.key = element_blank())
+
+```
+
+
+*****************************************************************
+
+# Load USDA Data on County Features
+
+```{r}
+
+### -------------------------------------------------- ###
+### File Locations
+### -------------------------------------------------- ###
+
+# USDA County Urban Influence Scores 
+file_usda_ui <- paste0(file_path_dat,
+                       "County_USDA_Urban_Influence/UrbanInfluenceCodes2013.csv")
+# USDA County Typology (includes econ type) 
+file_usda_tp <- paste0(file_path_dat,
+                       "County_USDA_Typology/ERSCountyTypology2015Edition.csv")
+# USDA County Rural Urban Continuum Scores
+file_usda_ru <- paste0(file_path_dat,
+                       "County_USDA_Rural-Urban_Continuum/ruralurbancodes2013.csv")
+# USDA County Rural Urban Continuum Scores from 1974
+file_usda_ru74 <- paste0(file_path_dat,
+                       "County_USDA_Rural-Urban_Continuum/ruralurbancodes1974.csv")
+
+### -------------------------------------------------- ###
+### Download & Combine Data
+### -------------------------------------------------- ###
+
+### USDA Urban Influence
+usda_ui <- read.csv(file = file_usda_ui, 
+                      header=TRUE, sep=",") %>% 
+  select(-State,-County_Name) %>%
+  rename(UIC_Descr = Description)
+
+### USDA Typology
+usda_tp <- read.csv(file = file_usda_tp, 
+                      header=TRUE, sep=",") #%>% 
+  #select(-State,-County_name)
+
+### USDA Rural-Urban
+usda_ru <- read.csv(file = file_usda_ru, 
+                      header=TRUE, sep=",") %>% 
+  select(-State,-County_Name, -Population_2010) %>%
+  rename(RUCC_Descr = Description)
+
+usda_ru74 <- read.csv(file = file_usda_ru74, 
+                      header=TRUE, sep=",") %>% 
+  mutate(FIPS = as.integer(as.character(FIPS.Code))) %>% 
+  rename(RUCC_1974 = X1974.Rural.urban.Continuum.Code) %>%
+  select(FIPS, RUCC_1974) %>%
+  filter(!is.na(FIPS))
+  
+### Combine USDA Data
+usda_all <- full_join(x = usda_ui, 
+                      y = usda_tp, 
+                      by = "FIPS")
+usda_all <- full_join(x = usda_all, 
+                      y = usda_ru, 
+                      by = "FIPS")
+usda_all <- full_join(x = usda_all,
+                      y = usda_ru74, 
+                      by = "FIPS")
+
+# glimpse(usda_all)
+```
+
+*****************************************************************
+
+# Load Census Population Data
+
+## Using CSV from Census Website
+```{r}
+
+### Census Rural Urban Pop Totals 
+# Source: https://www.census.gov/geo/reference/urban-rural.html
+
+# File Path 
+file_census_ru <- paste0(file_path_dat,
+                         "County_Rural_Census/County_Rural_Lookup.csv")
+
+# Download data
+census_ru <- read.csv(file = file_census_ru, 
+                      header=TRUE, 
+                      sep=",",
+                      colClasses = c("character",
+                                     "character",
+                                     "character",
+                                     "numeric",
+                                     "numeric",
+                                     "numeric",
+                                     "numeric")) %>% 
+  mutate(FIPS = as.integer(fips_code)) %>% 
+  mutate(state_code = as.integer(substr(fips_code, start = 1, stop = 2))) %>%
+  print()
+
+### Add summary by state
+census_ru_state_totals <- census_ru %>% 
+  group_by(state_code) %>%
+  summarise(state_total_pop = sum(total_pop),
+            state_total_pop_urban = sum(total_pop_urban),
+            state_total_pop_rural = sum(total_pop_rural),
+            state_percent_rural = sum(total_pop_rural)/sum(total_pop) ) %>%
+  ungroup() %>%
+  print()
+
+census_ru <- left_join(x = census_ru, 
+                       y = census_ru_state_totals, 
+                       by = "state_code")
+
+```
+
+## Using Tidycensus R package and census API
+
+Sources:  
+https://walkerke.github.io/tidycensus/articles/spatial-data.html  
+https://www.pdx.edu/prc/sites/www.pdx.edu.prc/files/06_pragmatic_tidy.pdf  
+http://knaaptime.com/projects/neighborhood-types/opportunity-types-in-r/  
+http://dlab.berkeley.edu/blog/season-sharing-data-working-newly-released-census-2010-2014-acs-5-year-data-r  
+https://www.gl-li.com/  
+https://factfinder.census.gov/faces/nav/jsf/pages/index.xhtml  
+http://edrub.in/ARE212/section12.html#spatial_data  
+https://edzer.github.io/UseR2017/  
+
+```{r}
+
+# ### ---
+# ### Note:
+# ### The code below should download the data summarized in the CSV above, but for some reason
+# ### the census API is returning zeros for all the values other than total population/housing units
+# ### ---
+# 
+# 
+# ### Save List of Variables from ACS and Census
+# # Use View() and filter within view to search variables 
+# vars_acs5_16 <- tidycensus::load_variables(year = 2016, #year of Census or endyear of ACS
+#                                   dataset = "acs5", #options: "sf1", "sf3", or "acs5"
+#                                   cache = TRUE)
+# 
+# vars_sf1_10 <- tidycensus::load_variables(year = 2010, #year of Census or endyear of ACS
+#                                   dataset = "sf1", #options: "sf1", "sf3", or "acs5"
+#                                   cache = TRUE)
+# # See also http://wagda.lib.washington.edu/data/type/census/geodb/metadata/SF1qkRef_2010.pdf
+# 
+# 
+# ### Download 2010 Housing Units Data from Census
+# census_housing_vars <- c(housing_units = "H00010001",
+#                          housing_units2 = "H0020001",
+#                          housing_units_urban = "H0020002",
+#                          housing_units_urban_area = "H0020003", #Urban: !! Inside urbanized areas
+#                          housing_units_urban_cluster_u = "H0020004", #Urban: !! Inside urban clusters
+#                          housing_units_urban_cluster_r = "H0020005") #Rural !! Inside urban clusters
+# census_housing_vars_sum <- c("H00010001")
+# 
+# 
+# housing_2010 <- get_decennial(geography = "county", 
+#                               variables = census_housing_vars,
+#                               year = 2010,
+#                               geometry = FALSE,
+#                               summary_var = census_housing_vars_sum) %>%
+#   mutate(FIPS = as.integer(GEOID))
+# 
+# housing_2010_wide <- housing_2010 %>% 
+#   spread(key = variable,
+#          value = value)
+# 
+# 
+# ### Download 2010 Population Data from Census
+# census_pop_vars <- c(pop = "P0010001",
+#                      pop2 = "P0020001",
+#                      pop_urban = "P0020002",
+#                      pop_urban_area = "P0020003", #Urban: !! Inside urbanized areas
+#                      pop_urban_cluster_u = "P0020004", #Urban: !! Inside urban clusters
+#                      pop_urban_cluster_r = "P0020005") #Rural !! Inside urban clusters
+# census_pop_vars_sum <- c("P0010001")
+# 
+# pop_2010 <- get_decennial(geography = "county", 
+#                           variables = census_pop_vars,
+#                           year = 2010,
+#                           geometry = FALSE,
+#                           summary_var = census_pop_vars_sum) %>%
+#   mutate(FIPS = as.integer(GEOID))
+# 
+# pop_2010_wide <- pop_2010 %>% 
+#   spread(key = variable,
+#          value = value)
+# 
+# sum(pop_2010_wide$pop_urban_area)
+
+```
+
+
+
+*****************************************************************
+
+# Combine Data
+
+```{r}
+
+### -------------------------------------------------- ###
+### Merge USDA and Census Data with Map Data
+### -------------------------------------------------- ###
+
+### Download Map Data
+setwd(paste0(file_path_dat,"USDA_Shapefile/"))
+US_counties <- readOGR(dsn=".",layer="gz_2010_us_050_00_5m")
+#leave out AK, HI, and PR (state FIPS: 02, 15, and 72)
+#US.counties <- US.counties[!(US.counties$STATE %in% c("72")),]  #"02","15",
+county_data <- US_counties@data
+county_data <- cbind(id=rownames(county_data),county_data)
+county_data <- as_tibble(county_data)
+county_data %<>% mutate(FIPS = as.integer(paste0(STATE,COUNTY)))
+
+### Joining County data wth USDA Data
+county_data <- left_join(x = county_data, 
+                         y = usda_all, 
+                         by = "FIPS")
+
+### Joining County data wth Census Data
+county_data <- left_join(x = county_data, 
+                         y = census_ru, 
+                         by = "FIPS")
+
+### Create map dataframe
+map_df <- data.table(broom::tidy(US_counties)) 
+map_df <- left_join(x = map_df, 
+                    y = county_data, 
+                    by = "id")
+
+### Subset to mainland USA
+map_df_usa <- map_df[!(map_df$STATE %in% c("02","15","72")),]  
+
+### County and State Borders
+map_county <- map_data("county")
+map_state <- map_data("state")
+
+```
+
+
+*****************************************************************
+
+# Maps - Census by State
+
+```{r}
+
+### Create base plot by county
+plot_pct_rural_2010_s <- ggplot(map_df_usa, aes(x=long, y=lat, group=group)) +
+  geom_polygon(aes(fill = state_percent_rural)) +
+  geom_path(data = map_state , colour = "white", size=.1) +
+  coord_quickmap() +
+  labs(title="% Rural Population by State, 2010 Census", x="", y="") +
+  theme_void() 
+
+### Create plots with different color scales
+plot_pct_rural_2010_s_A <- plot_pct_rural_2010_s + 
+  scale_fill_viridis(option="A", direction=1)
+plot_pct_rural_2010_s_B <- plot_pct_rural_2010_s + 
+  scale_fill_viridis(option="B", direction=1)
+plot_pct_rural_2010_s_D <- plot_pct_rural_2010_s + 
+  scale_fill_viridis(option="D", direction=1)
+
+### View plots with different color scales
+plot_pct_rural_2010_s_A
+plot_pct_rural_2010_s_B
+plot_pct_rural_2010_s_D
+
+### Save plots with different color scales
+ggsave(paste0(file_path_proj,"Output/Census_rural_2010_s_USA_A.pdf"), 
+       plot = plot_pct_rural_2010_s_A, device = "pdf")
+ggsave(paste0(file_path_proj,"Output/Census_rural_2010_s_USA_B.pdf"), 
+       plot = plot_pct_rural_2010_s_B, device = "pdf")
+ggsave(paste0(file_path_proj,"Output/Census_rural_2010_s_USA_D.pdf"), 
+       plot = plot_pct_rural_2010_s_D, device = "pdf")
+
+```
+
+
+*****************************************************************
+
+# Maps - Census by County
+
+```{r}
+
+### Create base plot by county
+plot_pct_rural_2010 <- ggplot(map_df_usa, aes(x=long, y=lat, group=group)) +
+  geom_polygon(aes(fill = percent_rural)) +
+  geom_path(data = map_state , colour = "white", size=.1) +
+  coord_quickmap() +
+  labs(title="% Rural Population by County, 2010 Census", x="", y="") +
+  theme_void() 
+
+### Create plots with different color scales
+plot_pct_rural_2010_A <- plot_pct_rural_2010 + 
+  scale_fill_viridis(option="A", direction=1)
+plot_pct_rural_2010_B <- plot_pct_rural_2010 + 
+  scale_fill_viridis(option="B", direction=1)
+plot_pct_rural_2010_D <- plot_pct_rural_2010 + 
+  scale_fill_viridis(option="D", direction=1)
+
+### View plots with different color scales
+plot_pct_rural_2010_A
+plot_pct_rural_2010_B
+plot_pct_rural_2010_D
+
+### Save plots with different color scales
+ggsave(paste0(file_path_proj,"Output/Census_rural_2010_USA_A.pdf"), 
+       plot = plot_pct_rural_2010_A, device = "pdf")
+ggsave(paste0(file_path_proj,"Output/Census_rural_2010_USA_B.pdf"), 
+       plot = plot_pct_rural_2010_B, device = "pdf")
+ggsave(paste0(file_path_proj,"Output/Census_rural_2010_USA_D.pdf"), 
+       plot = plot_pct_rural_2010_D, device = "pdf")
+
+```
+
+
+*****************************************************************
+
+# Maps - USDA Est. by State
+
+```{r}
+
+### -------------------------------------------------- ###
+### Create Estimates using URCC 
+### -------------------------------------------------- ###
+
+### Recall RUCC_2013 Labels 
+labels_ru <- c("1"="Metro (>1000k)",
+               "2"="Metro (250-1000k)",
+               "3"="Metro (250-1000k)",
+               "4"="Non-Metro (Adj=Y; >20k)",
+               "5"="Non-Metro (Adj=N; >20k)",
+               "6"="Non-Metro, MAdj (Adj=Y; 2.5-20k)",
+               "7"="Non-Metro (Adj=N; 2.5-20k)",
+               "8"="Rural (Adj=Y; <2.5k)",
+               "9"="Rural (Adj=N; <2.5k)")
+
+### Create estimate of rural pop based on USDA RUCC
+map_df %<>% 
+  mutate(rural_RUCC_4 = ifelse(RUCC_2013 > 3, 1, 0) ) %>%
+  mutate(est_rural_pop_4 = rural_RUCC_4*total_pop) %>%
+  
+  mutate(rural_RUCC_5 = ifelse(RUCC_2013 > 4, 1, 0) ) %>%
+  mutate(est_rural_pop_5 = rural_RUCC_5*total_pop) %>%
+  
+  mutate(rural_RUCC_6 = ifelse(RUCC_2013 > 5, 1, 0) ) %>%
+  mutate(est_rural_pop_6 = rural_RUCC_6*total_pop) %>%
+  
+  mutate(rural_RUCC_7 = ifelse(RUCC_2013 > 6, 1, 0) ) %>%
+  mutate(est_rural_pop_7 = rural_RUCC_7*total_pop)
+  
+### Add summary by state
+map_df_state_totals <- map_df %>% 
+  group_by(state_code) %>%
+  summarise(state_percent_rural_URCC_est_4 = sum(est_rural_pop_4)/sum(total_pop),
+            state_percent_rural_URCC_est_5 = sum(est_rural_pop_5)/sum(total_pop),
+            state_percent_rural_URCC_est_6 = sum(est_rural_pop_6)/sum(total_pop),
+            state_percent_rural_URCC_est_7 = sum(est_rural_pop_7)/sum(total_pop)) 
+
+map_df<- left_join(x = map_df, 
+                       y = map_df_state_totals, 
+                       by = "state_code")
+
+### Subset to continential states
+map_df_usa <- map_df[!(map_df$STATE %in% c("02","15","72")),] 
+
+
+### -------------------------------------------------- ###
+### Create Estimates using UIC 
+### -------------------------------------------------- ###
+
+### Recall UIC_2013 Labels 
+labels_ui <- c("1"="Metro, Large",
+               "2"="Metro, Small",
+               "3"="Micro, Adj Large Metro",
+               "4"="Noncore, Adj Large Metro",
+               "5"="Micro, Adj Small Metro",
+               "6"="Noncore (town>2.5k), Adj Large Metro",
+               "7"="Noncore (town<2.5k), Adj Large Metro",
+               "8"="Micro, Not Adj",
+               "9"="Noncore (town>2.5k), Adj Micro",
+               "10"="Noncore (town<2.5k), Adj Micro",
+               "11"="Noncore (town>2.5k), Adj Noncore",
+               "12"="Noncore (town<2.5k), Adj Noncore")
+
+### Create estimate of rural pop based on USDA RUCC
+map_df %<>% 
+  mutate(rural_UICC_6 = ifelse(UIC_2013 > 5, 1, 0) ) %>%
+  mutate(est_rural_pop_UICC_6 = rural_UICC_6*total_pop) %>%
+  
+  mutate(rural_UICC_7 = ifelse(UIC_2013 > 6, 1, 0) ) %>%
+  mutate(est_rural_pop_UICC_7 = rural_UICC_7*total_pop) %>%
+  
+  mutate(rural_UICC_8 = ifelse(UIC_2013 > 7, 1, 0) ) %>%
+  mutate(est_rural_pop_UICC_8 = rural_UICC_8*total_pop) %>%
+  
+  mutate(rural_UICC_9 = ifelse(UIC_2013 > 8, 1, 0) ) %>%
+  mutate(est_rural_pop_UICC_9 = rural_UICC_9*total_pop)
+   
+  
+### Add summary by state
+map_df_state_totals <- map_df %>% 
+  group_by(state_code) %>%
+  summarise(state_percent_rural_UICC_est_6 = sum(est_rural_pop_UICC_6)/sum(total_pop),
+            state_percent_rural_UICC_est_7 = sum(est_rural_pop_UICC_7)/sum(total_pop),
+            state_percent_rural_UICC_est_8 = sum(est_rural_pop_UICC_8)/sum(total_pop),
+            state_percent_rural_UICC_est_9 = sum(est_rural_pop_UICC_9)/sum(total_pop)) 
+
+map_df<- left_join(x = map_df, 
+                       y = map_df_state_totals, 
+                       by = "state_code")
+
+### Subset to continential states
+map_df_usa <- map_df[!(map_df$STATE %in% c("02","15","72")),] 
+
+
+### -------------------------------------------------- ###
+### Map using URCC and UIC 
+### -------------------------------------------------- ###
+
+
+### Create function for plotting by state
+plot_USDA <- function(number, scale, dat, fill_var){
+  plot1 <- ggplot(dat, aes(x=long, y=lat, group=group)) +
+    geom_polygon(aes_string(fill = fill_var)) +
+    geom_path(data = map_state , colour = "white", size=.1) +
+    coord_quickmap() +
+    labs(title=paste0("% Rural Population, USDA ",scale," > ",number-1), 
+         x="", y="") +
+    theme_void() + 
+    scale_fill_viridis(option="B", direction=1)
+  
+  ggsave(paste0(file_path_proj,"Output/USDA_",scale,number,"_rural_2010_USA_B.pdf"), 
+       plot = plot1, device = "pdf")
+  
+  return(plot1)
+}
+
+### URCC Maps
+plot_USDA(number = 4,
+          scale = "URCC", 
+          dat = map_df_usa, 
+          fill_var = "state_percent_rural_URCC_est_4")
+
+plot_USDA(number = 5,
+          scale = "URCC", 
+          dat = map_df_usa, 
+          fill_var = "state_percent_rural_URCC_est_5")
+
+plot_USDA(number = 6,
+          scale = "URCC", 
+          dat = map_df_usa, 
+          fill_var = "state_percent_rural_URCC_est_6")
+
+plot_USDA(number = 7,
+          scale = "URCC", 
+          dat = map_df_usa, 
+          fill_var = "state_percent_rural_URCC_est_7")
+
+
+### UIC Maps
+plot_USDA(number = 6,
+          scale = "UIC", 
+          dat = map_df_usa, 
+          fill_var = "state_percent_rural_UICC_est_6")
+
+plot_USDA(number = 7,
+          scale = "UIC", 
+          dat = map_df_usa, 
+          fill_var = "state_percent_rural_UICC_est_7")
+
+plot_USDA(number = 8,
+          scale = "UIC", 
+          dat = map_df_usa, 
+          fill_var = "state_percent_rural_UICC_est_8")
+
+plot_USDA(number = 9,
+          scale = "UIC", 
+          dat = map_df_usa, 
+          fill_var = "state_percent_rural_UICC_est_9")
+
+```
+
+```{r}
+
+### Comparing USDA scales to Census rural designation
+
+# UIC vs. Census (plot then save)
+ggplot(county_data, aes(x=UIC_2013, y=percent_rural)) + 
+  geom_point(shape = 21, alpha=.5) +
+  geom_smooth(method = "lm",
+              span = .1,  # Add fitted line 
+              formula = y ~ x, #Source: http://ggplot2.tidyverse.org/reference/geom_smooth.html
+              se = TRUE, 
+              color="red") + 
+  ggtitle("All Counties, UIC (USDA) vs. %Rural (Census)") +
+  my_theme
+
+ggsave(paste0(file_path_proj,"Output/Compare_UIC_v_Census_Rural.pdf"), 
+       plot = last_plot(), device = "pdf")
+
+# RUCC vs. Census (plot then save)
+ggplot(county_data, aes(x=RUCC_2013, y=percent_rural)) + 
+  geom_point(shape = 21, alpha=.5) +
+  geom_smooth(method = "lm",
+              span = .1,  # Add fitted line 
+              formula = y ~ x, #Source: http://ggplot2.tidyverse.org/reference/geom_smooth.html
+              se = TRUE, 
+              color="red") + 
+  ggtitle("All Counties, RUCC (USDA) vs. %Rural (Census)") +
+  my_theme
+
+ggsave(paste0(file_path_proj,"Output/Compare_RUCC_v_Census_Rural.pdf"), 
+       plot = last_plot(), device = "pdf")
+
+
+
+### What's going on with Colorado?
+# Colorado is the most noticable difference between Census and USDA estimates in the above plots 
+co_data <- county_data %>%
+  select(abb, UIC_2013, RUCC_2013, total_pop, percent_rural) %>%
+  filter(abb=="CO")
+
+ggplot(co_data, aes(x=UIC_2013, y=percent_rural)) + 
+  geom_point(shape = 21, alpha=.5) +
+  geom_smooth(method = "lm",
+              span = .1,  # Add fitted line 
+              formula = y ~ x, #Source: http://ggplot2.tidyverse.org/reference/geom_smooth.html
+              se = TRUE, 
+              color="red") + 
+  ggtitle("CO Counties, UIC vs. %Rural") +
+  my_theme
+
+ggplot(co_data, aes(x=RUCC_2013, y=percent_rural)) + 
+  geom_point(shape = 21, alpha=.5) +
+  geom_smooth(method = "lm",
+              span = .1,  # Add fitted line 
+              formula = y ~ x, #Source: http://ggplot2.tidyverse.org/reference/geom_smooth.html
+              se = TRUE, 
+              color="red") + 
+  ggtitle("CO Counties, URCC vs. %Rural") +
+  my_theme
+
+```
+
+
