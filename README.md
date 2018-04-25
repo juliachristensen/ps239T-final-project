@@ -93,6 +93,8 @@ The following files and folders are stored here: "ps239T-final-project\Geo_Proje
 37.  Compare_RUCC_v_Census_Rural_USA.pdf: Plot USDA scale (RUCC) against Census % rural by county.  
 36.  Compare_UIC_v_Census_Rural_WY.pdf: Plot USDA scale (UIC) against Census % rural by county in Wyoming.  
 37.  Compare_RUCC_v_Census_Rural_WY.pdf: Plot USDA scale (RUCC) against Census % rural by county in Wyoming.  
+36.  Compare_UIC_v_Census_Rural_USA_rural.pdf: Plot USDA scale (UIC) against Census % rural by county with UIC > 3.  
+37.  Compare_RUCC_v_Census_Rural_USA_rural.pdf: Plot USDA scale (RUCC) against Census % rural by county with RUCC > 3.  
 
 
 ## More Information
