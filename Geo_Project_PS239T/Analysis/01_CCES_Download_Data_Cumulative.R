@@ -38,14 +38,14 @@ file_path_dat_CC_sub <- paste0(file_path_dat,"cumulative_2006_2016.rds")
 ### ---- Download Original Data ---- 
 ### -------------------------------------------------- ###
 
-### Download and subset original data
-cces_dat <- readRDS(paste0(file_path_dat,"cumulative_2006_2016.rds")) %>% 
-  as_tibble() %>%
-  select(-cd, -state) #Remove 2 variables to get under github size limit
+# ### Download and subset original data
+# cces_dat <- readRDS(paste0(file_path_dat,"cumulative_2006_2016.rds")) %>% 
+#   as_tibble() %>%
+#   select(-cd, -state) #Remove 2 variables to get under github size limit
 
-### Save Subsetted data
-save(cces_dat, 
-     file = file_path_dat_CC_sub)
+# ### Save Subsetted data
+# save(cces_dat, 
+#      file = file_path_dat_CC_sub)
 
 
 ### -------------------------------------------------- ###
